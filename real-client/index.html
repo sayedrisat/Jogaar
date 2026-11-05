@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/Jogaar_Icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jogaar</title>
+    <script>
+      // Match the saved/system theme before React paints the page.
+      try {
+        const saved = localStorage.getItem('jogaar-theme');
+        const mode = ['light', 'dark', 'auto'].includes(saved) ? saved : 'auto';
+        document.documentElement.dataset.theme = mode === 'auto'
+          ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : mode;
+      } catch {
+        document.documentElement.dataset.theme = 'light';
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

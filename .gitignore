@@ -1,0 +1,23 @@
+# Dependencies and generated files (all packages)
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.log
+
+# Local credentials; publish examples only
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+
+# Local social/profile screenshots
+/social/
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/

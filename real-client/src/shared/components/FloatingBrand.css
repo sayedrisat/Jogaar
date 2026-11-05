@@ -1,0 +1,46 @@
+.floating-brand {
+  position: fixed;
+  z-index: 40;
+  top: 12px;
+  left: 50%;
+  display: block;
+  width: clamp(230px, 24vw, 300px);
+  clip-path: inset(0 0% 0 0);
+  opacity: 1;
+  transform: translateX(-50%);
+  transform-origin: 0 0;
+  will-change: transform, left, opacity;
+}
+
+.floating-brand:hover,
+.floating-brand:focus-visible {
+  opacity: 1 !important;
+}
+
+.floating-brand-art,
+.floating-brand-art svg {
+  display: block;
+  width: 100%;
+}
+
+.floating-brand-art svg {
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 8px 16px rgb(24 34 60 / 12%));
+}
+
+:root[data-theme="dark"] .floating-brand-art svg {
+  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 28%));
+}
+
+@media (max-width: 640px) {
+  .floating-brand {
+    top: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-brand {
+    will-change: auto;
+  }
+}
