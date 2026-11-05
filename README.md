@@ -117,7 +117,7 @@ Browser tests build the production client, start its preview proxy and a real AP
 
 Tests generate temporary databases named `jogaar_auth_test_*` and `jogaar_browser_test_*`, then delete only those databases. They generate signing secrets and do not read the backend `.env`. Use `TEST_MONGO_URI` to select an alternate **disposable test MongoDB**; the default is localhost:27017. Do not point tests at production infrastructure. Test reports/builds are ignored by Git.
 
-GitHub Actions runs these checks using Node 24, MongoDB 8.0 and Chromium. See [status](docs/STATUS.md) for results and limits.
+GitHub Actions runs these checks using Node 24, MongoDB 8.0 and Chromium on Ubuntu 22.04, pinned for MongoDB/kernel compatibility. See [status](docs/STATUS.md) for results and limits.
 
 ## Next steps
 

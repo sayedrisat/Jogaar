@@ -10,7 +10,9 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Keep MongoDB 8.0 on the compatible 6.8 kernel provided by this runner.
+    # https://jira.mongodb.org/browse/SERVER-121912
+    runs-on: ubuntu-22.04
     services:
       mongodb:
         image: mongo:8.0

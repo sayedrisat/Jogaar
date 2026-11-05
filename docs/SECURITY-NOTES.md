@@ -20,6 +20,7 @@ The November 2026 auth update fixes the observed rejection-path, role-validation
 - **Legacy sessions need login again.** Older cookies/claims and plaintext stored refresh values are rejected. Successful login overwrites the existing field with a digest; no live database migration is performed.
 - **Rate limits are in-memory and reset on restart.** Multiple instances require a shared store. Review trusted proxy addresses and real client-IP propagation before hosting; do not enable unrestricted `trust proxy`.
 - **Production hosting is unverified.** Use HTTPS, set `NODE_ENV=production` and an exact HTTPS `PUBLIC_ORIGIN`, serve frontend/API through one origin, configure SPA fallback and restrict database access. The origin policy permits non-browser clients that omit Origin; it is not an authentication mechanism.
+- **MongoDB requires a compatible host kernel.** Review the vendor's [production notes](https://www.mongodb.com/docs/manual/administration/production-notes/) when choosing a host. CI pins Ubuntu 22.04 after MongoDB 8.0 refused to start on the default runner due to [SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912).
 - **Future marketplace authorization remains necessary.** Client guards and the `/me` role allowlist do not grant ownership protection to endpoints that have not been built.
 - Account recovery, email verification, a full production logging/monitoring policy and deployment acceptance remain future work.
 
