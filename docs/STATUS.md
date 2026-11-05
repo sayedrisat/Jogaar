@@ -33,3 +33,5 @@ Status reviewed on **5 November 2026** against the local source. “Present” m
 - Backend: no automated test script is implemented. The original `npm test` placeholder remains a failure, not a passing test.
 - Isolated API smoke verification: ten checks passed against a temporary local MongoDB database, covering registration + HttpOnly cookies, authenticated `/me`, login, refresh and logout for both roles. The temporary database was removed. This is not a complete negative-path or browser authentication suite.
 - Backend syntax checks: all ten JavaScript modules passed `node --check`.
+
+- Production dependency audit: frontend and backend report zero known advisories after resolving `body-parser` to 2.4.0; isolated API smoke checks passed again after that update. This does not establish application-level security.

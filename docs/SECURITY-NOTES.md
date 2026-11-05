@@ -16,3 +16,7 @@ Fix and test these cases before deploying the API for real accounts. These notes
 The root `.gitignore` excludes `.env`, nested `.env.*` files, private-key file extensions, dependencies and build output while permitting `.env.example`. The backend example contains placeholders and a local database URI only. Never paste real JWTs, database credentials, cookies or personal user records into issues or documentation.
 
 If a real credential is discovered in published files or history, rotate it at its provider before removing the exposed copy. Deleting a file does not revoke a credential. No Git history rewrite is part of this task.
+
+## Dependency review
+
+The backend lockfile resolves `body-parser` 2.4.0, which patches [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828). Production dependency audits for both packages reported zero known advisories on 5 November 2026. This registry result does not cover the application-level limitations listed above.
