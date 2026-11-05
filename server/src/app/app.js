@@ -1,11 +1,17 @@
-import express from 'express'
-import cookieParser from 'cookie-parser'
-import router from '../routes/auth.routes.js'
+import express from "express";
+import cookieParser from "cookie-parser";
+import { createAuthRouter } from "../routes/auth.routes.js";
+import { errorHandler } from "../middleware/error.middleware.js";
 
-let app = express()
-app.use(express.json())
-app.use(cookieParser())
+export function createApp(options) {
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(express.json({ limit: "16kb" }));
+  app.use(cookieParser());
+  app.use("/api/auth", createAuthRouter(options));
+  app.use((req, res) => res.status(404).json({ message: "Route not found", code: "NOT_FOUND" }));
+  app.use(errorHandler);
+  return app;
+}
 
-app.use("/api/auth", router)
-
-export default app;
+export default createApp();

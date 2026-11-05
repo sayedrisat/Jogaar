@@ -1,274 +1,79 @@
-import userModel from "../model/user.model.js"
-import bcrypt from "bcryptjs"
-import { createAccessToken, createRefreshToken, readRefreshToken } from "../utils/auth.utils.js"
+import userModel from "../model/user.model.js";
+import bcrypt from "bcryptjs";
+import { createAccessToken, createRefreshToken, readRefreshToken, hashRefreshToken } from "../utils/auth.utils.js";
+import { clearRefreshCookie, setRefreshCookie } from "../utils/auth-cookie.js";
+import { HttpError } from "../utils/http-error.js";
+import { USER_ROLES } from "../constants/auth.constants.js";
 
-
-/**
- * ✦ Register controller flow
- * Main motive: create a user in db. if not exits.
- * destructure name, email, password from req.body comes from client
- * check if the user is alreate exist in database or not, 
- * if yes then return with response 401 that user is already exist the following email adress.
- * if no then create a new user with the data.
- * aftar that create accessToken and refreshToken 
- * then response refreshToken set to cookie
- * and update refreshToken in db
- * then responst 201 with creaeted massage, data and accessToken
- * done...
- * @param req
- * @returns res
- */
-
-
-export const registerController = async (req, res) => {
-    const {name, email, password, role} = req.body
-
-    const isUserAlreadyExit = await userModel.findOne({
-        email
-    })
-
-    if(isUserAlreadyExit){
-        res.status(401).json({
-            message:"User already exists with this email address",
-            error:[
-                {
-                    path: "email",
-                    msg: "User already exists with this email address"
-                }
-
-            ]
-        })
-    }
-
-    const user = await userModel.create({
-        name,
-        email,
-        role,
-        passwordHash: await bcrypt.hash(password, 12)
-    })
-
-    const accessToken = createAccessToken({
-        userId: user._id,
-        role: user.role
-    })
-
-    const refreshToken = createRefreshToken({
-        userId: user._id,
-        role: user.role
-    })
-
-    res.cookie("refreshToken", refreshToken, {
-        httpOnly: true
-    })
-
-    await userModel.findByIdAndUpdate(user._id, {refreshToken})
-
-    res.status(201).json({
-        message: "User created succesfully",
-        data:{
-            user:{
-                name: user.name,
-                role: user.role,
-                id: user._id
-            },
-            accessToken
-        }
-
-    })
-
+function publicUser(user) {
+  return { id: String(user._id), name: user.name, email: user.email, role: user.role };
 }
 
-
-/**
- * ✦ Login controller flow
- * Main motive: login a existing user.
- * destructure email and password from req.body which comes from client
- * find the user by email address
- * if no user found return 401 error with invaild cradandial
- * compare password with db user password 
- * if not matched return 401 error with invaild cradandial
- * if matched then create accesstoken and refreshToken
- * res in cookie set the refreshToken to cookie 
- * then update the refreshToken to database
- * then res 201 with success loggin and send data and accessToken with res
- * done
- * @param req
- * @returns res
- */
-
-
-export const loginController = async (req, res) => {
-    const {email, password} = req.body
-
-    const user = await userModel.findOne({email})
-    if(!user){
-        res.status(401).json({
-            message:"Invalid email or password"
-        })
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
-
-    if(!isPasswordValid){
-        res.status(401).json({
-            message:"Invalid email or password"
-        })
-    }
-
-    const accessToken = createAccessToken({
-        userId: user._id, 
-        role: user.role
-    })
-
-    const refreshToken = createRefreshToken({
-        userId: user._id,
-        role: user.role
-    })
-
-    res.cookie("refreshToken", refreshToken, 
-        {
-            httpOnly: true
-        }
-    )
-
-    await userModel.findByIdAndUpdate(user._id, {refreshToken})
-
-    res.status(200).json({
-        message:"user loggedin successfully",
-        data: {
-            user: {
-                name: user.name,
-                role: user.role,
-                id: user._id
-            },
-            accessToken
-        }
-    })
+function sessionTokens(userId, role) {
+  const payload = { userId, role };
+  return { accessToken: createAccessToken(payload), refreshToken: createRefreshToken(payload) };
 }
 
-/**
- * ✦ Refresh Controller flow
- * Main motive: rotate the tokens
- * destructure the refresh token from the req.cookies 
- * check refreshToken exist or not if not response 401 with required message
- * the try and catch if try failed for any reaseon that mean invalid refresh token so res error
- * decode and verify the refresh token comes from client
- * get userId and role after decoded find user by userid, 
- * if found then match the refresh token come from client and the token saved in database
- *  is not match first find user and make the value of refreshToken null then return with 401 missmatch
- * if matched the create new accessToken and refreshToken,
- * send refresh token in cookie with res
- * and update refresh token in database
- * then res with data and accessToken to client
- * done..
- *
- * @param req -> cookies
- * @returns res ->
- */
-
-export const refreshController = async (req, res) => {
-    const {refreshToken} = req.cookies
-
-    if(!refreshToken){
-        res.status(401).json({
-            message: "Refresh Token required"
-        })
-    }
-
-    try {
-        const decoded = readRefreshToken(refreshToken)
-        const {userId, role} = decoded
-
-        const user = await userModel.findById(userId)
-
-        if(refreshToken !== user.refreshToken){
-            await userModel.findByIdAndUpdate(user._id, {
-                refreshToken:null
-            })
-
-            return res.status(401).json({
-                message:"refresh token missmatch"
-            })
-        }
-
-        const newAccessToken = createAccessToken({userId, role})
-        const newRefreshToken = createRefreshToken({userId, role})
-
-        res.cookie("refreshToken", newRefreshToken, {
-            httpOnly: true
-        })
-
-        await userModel.findByIdAndUpdate(user._id, {
-            refreshToken: newRefreshToken
-        })
-
-        res.status(200).json({
-            message: "token roatated successfully",
-            data:{
-                user: {
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    id: user._id
-                },
-                accessToken: newAccessToken
-            }
-        })
-
-    } catch (error) {
-        return res.status(401).json({
-            message: "invalid refresh token"
-        })
-    }
+export async function registerController(req, res) {
+  const { name, email, password, role } = req.body;
+  if (await userModel.exists({ email })) {
+    throw new HttpError(409, "An account already exists with this email", "EMAIL_EXISTS");
+  }
+  const user = new userModel({ name, email, role, passwordHash: await bcrypt.hash(password, 12) });
+  const tokens = sessionTokens(user._id, user.role);
+  user.refreshToken = hashRefreshToken(tokens.refreshToken);
+  await user.save();
+  setRefreshCookie(res, tokens.refreshToken);
+  return res.status(201).json({ message: "Account created", data: { user: publicUser(user), accessToken: tokens.accessToken } });
 }
 
-/**
- * ✦ get user controller flow
- * destructure userId from req.user comes from client and set in req.user by middleware
- * find user fron db 
- * then res with user data
- * done...
- *
- * @param req
- * @returns res
- */
-
-
-export const getMeController = async (req, res) => {
-    const {userId} = req.user
-    const user = await userModel.findById(userId)
-
-    res.status(200).json({
-        message: "user fatched successfully",
-        data:{
-            user:{
-                name:user.name,
-                email: user.email,
-                role: user.role,
-                id: user._id
-            }
-        }
-    })
+export async function loginController(req, res) {
+  const { email, password } = req.body;
+  const user = await userModel.findOne({ email }).select("+passwordHash");
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+  }
+  if (!USER_ROLES.includes(user.role)) {
+    throw new HttpError(403, "Account role is not supported", "FORBIDDEN");
+  }
+  const tokens = sessionTokens(user._id, user.role);
+  const updated = await userModel.findOneAndUpdate(
+    { _id: user._id, role: user.role, passwordHash: user.passwordHash },
+    { $set: { refreshToken: hashRefreshToken(tokens.refreshToken) } },
+    { returnDocument: "after" },
+  );
+  if (!updated) throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
+  setRefreshCookie(res, tokens.refreshToken);
+  return res.status(200).json({ message: "Signed in", data: { user: publicUser(updated), accessToken: tokens.accessToken } });
 }
 
-export const logoutController = async (req, res) => {
-    try {
-        const {refreshToken} = req.cookies
-        
-        if(refreshToken){
-            await userModel.findOneAndUpdate({refreshToken}, {refreshToken: null})
-        }
+export async function refreshController(req, res) {
+  const token = req.cookies?.refreshToken;
+  if (typeof token !== "string" || !token) {
+    throw new HttpError(401, "Refresh Token required", "UNAUTHENTICATED");
+  }
+  const claims = readRefreshToken(token);
+  const tokens = sessionTokens(claims.userId, claims.role);
+  // Compare and replace in one database operation so only one concurrent refresh wins.
+  const user = await userModel.findOneAndUpdate(
+    { _id: claims.userId, role: claims.role, refreshToken: hashRefreshToken(token) },
+    { $set: { refreshToken: hashRefreshToken(tokens.refreshToken) } },
+    { returnDocument: "after" },
+  );
+  if (!user) throw new HttpError(401, "Session is no longer valid", "UNAUTHENTICATED");
+  setRefreshCookie(res, tokens.refreshToken);
+  return res.status(200).json({ message: "Session refreshed", data: { user: publicUser(user), accessToken: tokens.accessToken } });
+}
 
-        res.clearCookie("refreshToken", {
-            httpOnly:true
-        })
+export function getMeController(req, res) {
+  return res.status(200).json({ message: "User fetched", data: { user: publicUser(req.user) } });
+}
 
-        return res.status(201).json({
-            message: "loggout successfully "
-        })
-    } catch (error) {
-        return res.status(500).json({
-            message: "loggout failed"
-        })
-    }
+export async function logoutController(req, res) {
+  const token = req.cookies?.refreshToken;
+  if (typeof token === "string" && token) {
+    await userModel.updateOne({ refreshToken: hashRefreshToken(token) }, { $set: { refreshToken: null } });
+  }
+  clearRefreshCookie(res);
+  return res.status(200).json({ message: "Signed out" });
 }

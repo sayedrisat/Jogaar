@@ -1,54 +1,31 @@
 import { Router } from "express";
+import { rateLimit } from "express-rate-limit";
 import { loginValidator, registerValidator } from "../validator/auth.validator.js";
 import { getMeController, loginController, logoutController, refreshController, registerController } from "../controller/auth.controller.js";
-import { authenticate } from "../middleware/auth.middleware.js";
+import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import { requireSameOrigin } from "../middleware/origin.middleware.js";
+import { USER_ROLES } from "../constants/auth.constants.js";
 
-const router = Router()
+function limiter(limit, skipSuccessfulRequests = false) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit,
+    skipSuccessfulRequests,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ message: "Too many attempts. Try again later.", code: "RATE_LIMITED" }),
+  });
+}
 
-/**
- * @post /api/auth/register
- * @param req {name, email, password,role, confirmPassword}
- * @middleware registerValidator to validate
- * @returns res {201 - account created} if successfull
- * @returns res {401 - email already exist} if failed
- */
-
-router.post("/register", registerValidator, registerController)
-
-
-/**
- * @post /api/auth/login
- * @param req {email, password}
- * @middleware loginValidator to validate
- * @returns res {201 - redirect home} if successfull
- * @returns res {401 - Invalid Credential} if failed
- */
-
-router.post("/login", loginValidator, loginController)
-
-/**
- * @post /api/auth/logout
- * @param req refresh token from cookies
- * @returns res 200 if loggout success.
- */
-
-router.post("/logout", logoutController)
-
-/**
- * @post /api/auth/refresh
- * @param req refreshToken from cookies
- * @returns res {accessToken} refreshToken -> cookie
- */
-
-router.post("/refresh", refreshController)
-
-/**
- * @get /api/auth/me
- * @param req 
- * @middleware authenticate user
- * @returns res user information
- */
-
-router.get("/me", authenticate, getMeController)
-
-export default router
+export function createAuthRouter({ authLimit = 20, refreshLimit = 120 } = {}) {
+  const router = Router();
+  const loginLimiter = limiter(authLimit, true);
+  const registrationLimiter = limiter(authLimit);
+  const sessionLimiter = limiter(refreshLimit);
+  router.post("/register", requireSameOrigin, registrationLimiter, registerValidator, registerController);
+  router.post("/login", requireSameOrigin, loginLimiter, loginValidator, loginController);
+  router.post("/refresh", requireSameOrigin, sessionLimiter, refreshController);
+  router.post("/logout", requireSameOrigin, sessionLimiter, logoutController);
+  router.get("/me", authenticate, authorize(...USER_ROLES), getMeController);
+  return router;
+}

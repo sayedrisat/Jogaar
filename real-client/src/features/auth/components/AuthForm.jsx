@@ -160,7 +160,7 @@ function AuthForm({ mode, onSubmit, onGoogleSignIn, onSwitchMode, titleId, authE
                   revealed={showConfirmPassword}
                 />
                 <p className="auth-password-hint">
-                  Use 8–128 characters with uppercase, lowercase, a number, and a special character.
+                  Use at least 8 characters (up to 72 UTF-8 bytes), with uppercase, lowercase, a number, and a special character.
                 </p>
               </>
             )}

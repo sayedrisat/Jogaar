@@ -1,37 +1,42 @@
 # Implementation status
 
-Status reviewed on **5 November 2026** against the local source. “Present” means the implementation exists; it does not imply complete error handling or production acceptance.
+Reviewed on **5 November 2026**. Authentication regression results below were executed locally; this remains an unfinished marketplace.
 
-## Present
+## Implemented and covered
 
-- [x] Express JSON/cookie parsing and auth router.
-- [x] Mongoose user records and bcrypt password hashing.
-- [x] Registration/login input validators and controllers.
-- [x] Access JWT and HttpOnly refresh-cookie issuance.
-- [x] Refresh reissuance, logout and authenticated `/me` endpoint.
-- [x] Redux session state and auth thunks.
-- [x] Shared session loader and client role guards.
-- [x] Sign-in/join dialogs, role-specific navigation, themes and landing page.
+- [x] Registration/login with bcrypt, strict role/input validation and concurrent duplicate-email handling.
+- [x] Shared JSON error handling, missing-user checks and normalized JWT errors.
+- [x] Explicit HttpOnly/SameSite/production Secure cookie policy and matching logout attributes.
+- [x] Hashed refresh storage, unique JWT IDs and atomic refresh rotation/replay rejection.
+- [x] Bearer authentication, current-role checks and reusable server role authorization.
+- [x] Same-origin checks, bounded JSON parsing and separate auth/session rate limits.
+- [x] Database/index readiness before listening; startup failures exit nonzero.
+- [x] Client 401-to-refresh recovery, shared pending checks and safe logout state.
+- [x] Sign-in/join dialogs, role navigation, landing page and themes.
+- [x] Server, client unit and real-browser authentication regressions; GitHub Actions workflow.
 
-## Unfinished
+## Verification
 
-- [ ] Strict server-side role validation and authorization middleware.
-- [ ] Reliable early returns, missing-user handling, and consistent JSON errors.
-- [ ] Production cookie policy, request throttling and refresh-token hardening.
-- [ ] Authentication unit/integration and end-to-end regression suites.
+| Check | Result |
+| --- | --- |
+| Server `npm test` | **36 passed**, including real-MongoDB integration, replay/concurrency, malformed requests, limits and database startup failure |
+| Client `npm run test:unit` | **11 passed**, covering session state, 401 recovery, server-error propagation and deduplication |
+| Client `npm run test:e2e` | **4 Chromium tests passed** against the built client and real API |
+| Client `npm run lint` | **Passed**, including the previous four unused-import errors |
+| Client production build | **Passed** as part of browser setup; Vite retains its existing large-chunk warning |
+| `npm audit --omit=dev` in both packages | **Zero known production dependency advisories** |
+
+Browser coverage: seeker and provider registration, cookie-backed reload, role-route redirection, logout/cookie removal, protected-route rejection, wrong-password feedback followed by valid login, and expired access JWT recovery through the real refresh API. The expiry test substitutes a signed expired Authorization header on one `/me` request; server responses and refresh persistence remain real.
+
+Tests generate disposable database names and synthetic secrets, then remove those databases. They do not read the developer's backend `.env`. This is local automated evidence, not a penetration test, production acceptance or cross-device verification. The checked-in workflow runs the same checks on push and pull requests; its current result is visible under GitHub Actions.
+
+## Remaining
+
 - [ ] Service listings, provider service management and seeker discovery.
-- [ ] Booking/request lifecycle, messaging and payments.
-- [ ] Editable profiles and a functional provider dashboard.
-- [ ] Production deployment, licensed distribution and CI.
+- [ ] Booking lifecycle, messaging and payments.
+- [ ] Editable profiles and functional provider dashboard tools.
+- [ ] Account recovery and email verification.
+- [ ] Independent device sessions, shared rate-limit storage and deployment-specific proxy/IP configuration.
+- [ ] Production hosting/HTTPS acceptance and repository-wide licensing.
 
-`Dashboard.jsx` explicitly reserves space for future tools; `Profile.jsx` currently renders a label.
-
-## Publication verification
-
-- Frontend production build: passed on 5 November 2026; Vite reported its existing large-chunk warning.
-- Frontend lint: currently fails with four existing unused-import errors in `src/app/router.jsx` and `src/pages/Profile.jsx`. No suppressions or application-logic changes were added for this documentation task.
-- Backend: no automated test script is implemented. The original `npm test` placeholder remains a failure, not a passing test.
-- Isolated API smoke verification: ten checks passed against a temporary local MongoDB database, covering registration + HttpOnly cookies, authenticated `/me`, login, refresh and logout for both roles. The temporary database was removed. This is not a complete negative-path or browser authentication suite.
-- Backend syntax checks: all ten JavaScript modules passed `node --check`.
-
-- Production dependency audit: frontend and backend report zero known advisories after resolving `body-parser` to 2.4.0; isolated API smoke checks passed again after that update. This does not establish application-level security.
+`Dashboard.jsx` reserves space for future tools; `Profile.jsx` currently renders a label. Future role-specific APIs must add resource authorization and ownership checks. See [security notes](SECURITY-NOTES.md) for session/deployment limits.

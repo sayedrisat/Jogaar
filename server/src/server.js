@@ -1,11 +1,19 @@
-import app from "./app/app.js"
+import app from "./app/app.js";
 import connectDB from "./config/db.js";
+import config from "./config/config.js";
+import userModel from "./model/user.model.js";
 
-const port = 3000
-
-await connectDB()
-
-app.listen(port, (req, res) => {
-    console.log("server is running on port:", port);
-    
-})
+try {
+  await connectDB();
+  await userModel.init();
+  const server = app.listen(config.PORT, () => {
+    console.log("Jogaar API listening on port", server.address().port);
+  });
+  server.on("error", (error) => {
+    console.error("Unable to listen", { code: error.code });
+    process.exit(1);
+  });
+} catch (error) {
+  console.error("Unable to start Jogaar API", { name: error.name });
+  process.exit(1);
+}

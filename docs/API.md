@@ -1,20 +1,18 @@
-# Authentication API — current development contract
+# Authentication API
 
-Base path: `/api/auth`. Requests with a body use `Content-Type: application/json`. The list below comes from `server/src/routes/auth.routes.js`; it is not a claim that all negative paths pass tests.
+Base path: `/api/auth`. Send request bodies as `application/json`; maximum JSON body size is 16 KiB. Browser session POSTs must use the same origin as the application. Non-browser requests without an Origin header are allowed.
 
-| Method | Path | Input / authentication | Success response |
+| Method | Path | Input / authentication | Success |
 | --- | --- | --- | --- |
-| POST | `/register` | JSON `name`, `email`, `role`, `password`, `confirmPassword` | 201, `data.user` and `data.accessToken`; refresh cookie |
-| POST | `/login` | JSON `email`, `password` | 200, `data.user` and `data.accessToken`; refresh cookie |
-| POST | `/refresh` | `refreshToken` cookie | 200, `data.user` and `data.accessToken`; replacement cookie |
-| POST | `/logout` | Optional `refreshToken` cookie | 201, success message; cookie cleared |
-| GET | `/me` | `Authorization: Bearer <access-token>` | 200, `data.user` |
+| POST | `/register` | `name`, `email`, `role`, `password`, `confirmPassword` | 201, user/access token and refresh cookie |
+| POST | `/login` | `email`, `password` | 200, user/access token and refresh cookie |
+| POST | `/refresh` | `refreshToken` cookie | 200, user/access token and replacement cookie |
+| POST | `/logout` | Optional refresh cookie | 200, success message and cleared cookie |
+| GET | `/me` | `Authorization: Bearer <access-token>` | 200, user |
 
-Registration and login user responses contain `name`, `role`, and `id`. Refresh and `/me` also return `email`. Access tokens are not returned by `/me` or logout. JWT helpers configure a 15-minute access lifetime and seven-day refresh lifetime.
+Every user response contains `{ id, name, email, role }`. Password hashes and refresh digests are excluded. Session responses have `{ message, data: { user, accessToken } }`; `/me` has `{ message, data: { user } }`. Logout returns `{ message: "Signed out" }`.
 
-The forms offer `seeker` and `provider`. **The backend currently checks that role is a string; it does not enforce an allowed-role list.** The model's role option is not a Mongoose `enum`. Do not describe this API as enforcing complete role-based authorization.
-
-## Example registration body
+## Validation
 
 ```json
 {
@@ -26,14 +24,38 @@ The forms offer `seeker` and `provider`. **The backend currently checks that rol
 }
 ```
 
-Use disposable development credentials, not this example in a real account. Password registration rules require 8–128 characters, uppercase, lowercase, a number and a non-alphanumeric character. The implementation trims the password during registration.
+Use disposable credentials rather than the example in a real account.
 
-## Errors and gaps
+- Name is trimmed and must contain 2–50 characters.
+- Email is trimmed and validated; existing case-sensitive email semantics are preserved.
+- Role must be exactly `seeker` or `provider`, checked by both validators and the schema.
+- Registration passwords need at least eight characters, uppercase, lowercase, a number and a special character. Both registration and login reject passwords longer than **72 UTF-8 bytes**, bcrypt's input boundary. Passwords are **never trimmed**. Confirmation must match exactly.
 
-- Request validators currently return 401 with `message` and an `errors` array.
-- Duplicate registration attempts and invalid login branches send 401 but are missing early returns. Subsequent database/token work can still run or throw.
-- Missing bearer tokens return 400. Invalid/expired JWTs are not normalized to 401 by the middleware.
-- Missing/invalid/mismatched refresh tokens are intended to return 401; missing-cookie early return and missing-user handling need correction.
-- There is no shared JSON error handler or server-side role-authorization middleware yet.
+## Errors
 
-Do not build clients around a finalized error schema until those cases are covered and corrected. No listing, booking, payment, messaging, service search, or profile-update endpoint is present.
+Errors use `{ message, code }`. Validation errors additionally contain `errors: [{ path, msg }]`; rejected input values are never echoed.
+
+| Status | Code / condition |
+| --- | --- |
+| 400 | `VALIDATION_ERROR`, `INVALID_JSON` |
+| 401 | `INVALID_CREDENTIALS` or `UNAUTHENTICATED`; missing/invalid/expired JWT, deleted user, changed role or stale refresh cookie |
+| 403 | `FORBIDDEN` for unauthorized roles; `ORIGIN_FORBIDDEN` for foreign/invalid browser origins |
+| 404 | `NOT_FOUND` for unknown routes |
+| 409 | `EMAIL_EXISTS`, including concurrent registration conflicts |
+| 413 | `PAYLOAD_TOO_LARGE` |
+| 415 | `UNSUPPORTED_ENCODING` |
+| 429 | `RATE_LIMITED`; includes `Retry-After` |
+| 503 | `DATABASE_UNAVAILABLE` for recognized database connection failures |
+| 500 | `INTERNAL_ERROR`; generic response without exception details |
+
+Wrong-password and unknown-email login use the same 401 message. Rejected registration/login does not issue cookies or mutate the existing session. A missing refresh cookie retains the client-compatible message `Refresh Token required`.
+
+## Sessions and limits
+
+Access JWTs last 15 minutes; refresh JWTs and browser cookie expiry last seven days. Both include a random `jti` and explicit purpose, issuer and audience. Only HS256 is accepted. Cookies use HttpOnly, SameSite=Lax, Path=/ and Secure in production.
+
+One refresh digest is stored per user. Successful login replaces the previous session. Refresh atomically matches and replaces the old digest, so one concurrent request succeeds and stale/replayed requests return 401. Failed refresh requests do not clear cookies or revoke the winning session. Clients should serialize refresh requests; loaders already deduplicate them within one page. Logout invalidates only the matching refresh digest and is idempotent without a valid cookie. Existing access tokens can remain valid until their 15-minute expiry.
+
+Per-process, per-IP limits use 15-minute windows: 20 registration attempts, 20 failed login attempts (successful logins are excluded), and a separate shared 120-request refresh/logout budget. These are baseline abuse controls, not a distributed session store.
+
+No service-listing, booking, payment, messaging, search or profile-update endpoint exists yet.

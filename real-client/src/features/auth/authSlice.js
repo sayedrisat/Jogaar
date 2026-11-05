@@ -55,7 +55,7 @@ export const authSlice = createSlice({
                 state.user = null
                 state.accessToken = null
                 state.status = "guest"
-                state.error = action.payload || null
+                state.error = logoutUser.fulfilled.match(action) ? null : action.payload || action.error?.message || null
             }
         )
     }

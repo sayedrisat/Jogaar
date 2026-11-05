@@ -21,3 +21,7 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Browser test reports
+playwright-report/
+test-results/

@@ -4,7 +4,7 @@
   "description": "Express and MongoDB authentication backend for the Jogaar marketplace prototype",
   "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --import ./test/setup.js --test --test-concurrency=1 test/*.test.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
@@ -20,6 +20,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
+    "express-rate-limit": "8.7.3",
     "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.2",

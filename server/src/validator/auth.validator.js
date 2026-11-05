@@ -1,89 +1,45 @@
-import { body, validationResult } from "express-validator"
+import { body, validationResult } from "express-validator";
+import { USER_ROLES } from "../constants/auth.constants.js";
+import { HttpError } from "../utils/http-error.js";
 
-/**
- * ✦ validation for Register
- * @name Required, string, 2-50 chars
- * @email Required, valid email format
- * @password Required, string, 8-128 chars, must contain:
- * At least one uppercase letter ([A-Z])
- * At least one lowercase letter ([a-z])
- * At least one number ([0-9])
- * At least one special character ([^A-Za-z0-9])
- * @confirmPassword Required, must match password field
- * @param req
- * @returns res
- * @call next
- */
+function rejectInvalidRequest(req, res, next) {
+  const result = validationResult(req);
+  if (!result.isEmpty()) {
+    const errors = result.array({ onlyFirstError: true }).map(({ path, msg }) => ({ path, msg }));
+    throw new HttpError(400, errors[0].msg, "VALIDATION_ERROR", errors);
+  }
+  next();
+}
+
+const emailRule = () => body("email")
+  .isString().withMessage("Email is required").bail()
+  .trim().isEmail().withMessage("Enter a valid email address");
+
+const passwordRule = () => body("password")
+  .isString().withMessage("Password is required").bail()
+  .notEmpty().withMessage("Password is required");
 
 export const registerValidator = [
-    body("name")
-        .exists().withMessage("Name is Required").bail()
-        .isString().withMessage("Name must be type string")
-        .trim()
-        .isLength({ min: 2, max: 50 }).withMessage("Name length must be between 2 and 50 characters"),
-    body("email")
-        .exists().withMessage("Email is Required").bail()
-        .trim()
-        .isEmail().withMessage("Enter a valid email address").bail(),
-    body("role")
-        .trim()
-        .isString().withMessage("Role must be type string").bail(),
-    body("password")
-        .exists().withMessage("Password is required").bail()
-        .isString().withMessage("Password must be a string").bail()
-        .trim()
-        .isLength({ min: 8, max: 128 }).withMessage("Password must be between 8 and 128 characters").bail()
-        .matches(/[A-Z]/).withMessage("Password must contain at least one uppercase letter").bail()
-        .matches(/[a-z]/).withMessage("Password must contain at least one lowercase letter").bail()
-        .matches(/[0-9]/).withMessage("Password must contain at least one number").bail()
-        .matches(/[^A-Za-z0-9]/).withMessage("Password must contain at least one special character"),
-    body("confirmPassword")
-        .exists().withMessage("Confirm password is required").bail()
-        .custom((value, { req }) => value === req.body.password)
-        .withMessage("Passwords do not match"),
-
-    (req, res, next) => {
-        const error = validationResult(req)
-        if(!error.isEmpty()){
-            return res.status(401).json({
-                message: "invalid Request",
-                errors: error.array()
-            })
-        }
-
-        next();
-    }
-]
-
-/**
- * ✦ Validator for login
- * @email Required, valid email format
- * @password Required, string (no complexity checks on login)
- *
- * @param req
- * @returns res
- * @call next
- */
-
+  body("name").isString().withMessage("Name is required").bail()
+    .trim().isLength({ min: 2, max: 50 }).withMessage("Name must contain 2–50 characters"),
+  emailRule(),
+  body("role").isString().withMessage("Role must be a string").bail()
+    .isIn(USER_ROLES).withMessage("Role must be seeker or provider"),
+  passwordRule().bail()
+    .isLength({ min: 8 }).withMessage("Password must contain at least 8 characters").bail()
+    .custom(value => Buffer.byteLength(value, "utf8") <= 72).withMessage("Password must not exceed 72 UTF-8 bytes").bail()
+    .matches(/[A-Z]/).withMessage("Password must contain an uppercase letter").bail()
+    .matches(/[a-z]/).withMessage("Password must contain a lowercase letter").bail()
+    .matches(/[0-9]/).withMessage("Password must contain a number").bail()
+    .matches(/[^A-Za-z0-9]/).withMessage("Password must contain a special character"),
+  body("confirmPassword").isString().withMessage("Confirm password is required").bail()
+    .custom((value, { req }) => value === req.body.password).withMessage("Passwords do not match"),
+  rejectInvalidRequest,
+];
 
 export const loginValidator = [
-    body("email")
-        .exists().withMessage("Email is Required").bail()
-        .trim()
-        .isEmail().withMessage("Enter a valid email address"),
-    body("password")
-        .exists().withMessage("Password is required").bail()
-        .isString().withMessage("Password must be a string"),
-
-    (req, res, next) => {
-        const error = validationResult(req)
-        if(!error.isEmpty()){
-            return res.status(401).json({
-                message: "invalid Request",
-                errors: error.array()
-            })
-        }
-
-        next();
-    }
-]
+  emailRule(),
+  passwordRule().bail()
+    .custom(value => Buffer.byteLength(value, "utf8") <= 72).withMessage("Password must not exceed 72 UTF-8 bytes"),
+  rejectInvalidRequest,
+];

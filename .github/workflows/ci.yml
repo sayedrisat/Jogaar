@@ -1,0 +1,50 @@
+name: Verify Jogaar
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_MONGO_URI: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            real-client/package-lock.json
+      - run: npm ci
+        working-directory: server
+      - run: npm ci
+        working-directory: real-client
+      - name: Server unit and isolated MongoDB integration tests
+        run: npm test
+        working-directory: server
+      - run: npm run lint
+        working-directory: real-client
+      - run: npm run test:unit
+        working-directory: real-client
+      - run: npx playwright install --with-deps chromium
+        working-directory: real-client
+      - name: Browser authentication against the built client and real API
+        run: npm run test:e2e
+        working-directory: real-client
